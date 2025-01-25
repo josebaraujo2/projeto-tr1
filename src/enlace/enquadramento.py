@@ -1,29 +1,30 @@
 def enquadrar_contagem_caracteres(dados, tamanho_quadro=8):
     """
-    Enquadramento por Contagem de Caracteres com tamanho fixo de quadro.
-    Formato: [Número de Bytes][Dados]
+    Enquadramento por Contagem de Caracteres em nível de bits.
+    Formato: [Número de Bits][Dados]
     """
-    quadros = b''
+    quadros = ''
     for i in range(0, len(dados), tamanho_quadro):
         chunk = dados[i:i+tamanho_quadro]
         # Adiciona cabeçalho com tamanho e dados do chunk
-        quadros += len(chunk).to_bytes(1, byteorder='big') + chunk.encode('ascii')
+        tamanho = format(len(chunk), '08b')  # Tamanho como 8 bits
+        quadros += tamanho + chunk
     return quadros
 
 def desenquadrar_contagem_caracteres(quadro):
     """
-    Desenquadra sequência de bytes com tamanho fixo de quadros.
-    Formato: [Número de Bytes][Dados]
+    Desenquadra sequência de bits com tamanho fixo de quadros.
+    Formato: [Número de Bits][Dados]
     """
-    dados = b''
+    dados = ''
     i = 0
     while i < len(quadro):
-        num_bytes = quadro[i] 
-        i += 1  
-        dados += quadro[i:i+num_bytes]
-        i += num_bytes  
-    return dados.decode('ascii')
-
+        # O primeiro byte (8 bits) é o tamanho
+        num_bits = int(quadro[i:i+8], 2)  # Converte os primeiros 8 bits para inteiro
+        i += 8  # Avança 8 bits
+        dados += quadro[i:i+num_bits]  # Adiciona os bits conforme o número indicado
+        i += num_bits  # Avança os bits lidos
+    return dados
 
 def enquadrar_insercao_bytes(dados):
     """
@@ -84,6 +85,7 @@ dados = "ola meu ~ nome } e jonas"
 quadro_contagem = enquadrar_contagem_caracteres(dados)
 quadro_insercao = enquadrar_insercao_bytes(dados)
 
+'''
 print("Contagem de Caracteres:")
 print(f"Quadro: {quadro_contagem}")
 print(f"Dados Originais: {desenquadrar_contagem_caracteres(quadro_contagem)}\n")
@@ -91,3 +93,4 @@ print(f"Dados Originais: {desenquadrar_contagem_caracteres(quadro_contagem)}\n")
 print("Inserção de Bytes:")
 print(f"Quadro: {quadro_insercao}")
 print(f"Dados Originais: {desenquadrar_insercao_bytes(quadro_insercao)}")
+'''
