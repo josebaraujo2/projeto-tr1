@@ -6,7 +6,6 @@ Simulador para demonstração do funcionamento da camada de enlace e camada fís
 
 - Python 3.8+
 - GTK 3.0
-- pyenv (Simple Python version management)
 - Bibliotecas Python listadas em _requirements.txt_
 
 ### Dependências do Sistema (Ubuntu / WSL)
@@ -31,13 +30,13 @@ $ pip install -r requirements.txt
 
 ### Problemas na Instalação
 
-Caso ocorra problemas na instalação por causa da versão 3.12 do Python, recomendamos a instalação da versão 3.11.11 através do pyenv.
-1. Instale o [pyenv](https://github.com/pyenv/pyenv)
+Caso ocorra problemas na instalação por causa da versão 3.12 do Python, recomendamos a instalação da versão 3.11.11 através do pyenv (Simple Python version management).
+1. Instale o [pyenv](https://github.com/pyenv/pyenv).
 2. Instale a versão 3.11.11:
 ```bash
 $ pyenv install 3.11.11
 ```
-3. Dentro do repositório clonado, defina a versão local do Python
+3. Dentro do repositório clonado, defina a versão local do Python:
 ```bash
 $ pyenv local 3.11.11
 ```
