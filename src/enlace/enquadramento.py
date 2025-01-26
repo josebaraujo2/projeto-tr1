@@ -3,12 +3,12 @@ def enquadrar_contagem_caracteres(dados, tamanho_quadro=8):
     Enquadramento por Contagem de Caracteres em nível de bits.
     Formato: [Número de Bits][Dados]
     """
-    quadros = ''
+    quadros = b''  # Use 'bytes' ao invés de 'string'
     for i in range(0, len(dados), tamanho_quadro):
         chunk = dados[i:i+tamanho_quadro]
         # Adiciona cabeçalho com tamanho e dados do chunk
         tamanho = format(len(chunk), '08b')  # Tamanho como 8 bits
-        quadros += tamanho + chunk
+        quadros += bytes(tamanho, 'utf-8') + chunk.encode('utf-8')  # Convertendo chunk para bytes
     return quadros
 
 def desenquadrar_contagem_caracteres(quadro):
@@ -16,7 +16,7 @@ def desenquadrar_contagem_caracteres(quadro):
     Desenquadra sequência de bits com tamanho fixo de quadros.
     Formato: [Número de Bits][Dados]
     """
-    dados = ''
+    dados = b''  # Use 'bytes' ao invés de 'string'
     i = 0
     while i < len(quadro):
         # O primeiro byte (8 bits) é o tamanho
