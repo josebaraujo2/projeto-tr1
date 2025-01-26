@@ -1,56 +1,68 @@
 import gi
-gi.require_version("Gtk", "3.0")  # Se usar GTK 4, ajuste aqui
+gi.require_version("Gtk", "3.0")  # ou "4.0" se você estiver usando GTK4
 from gi.repository import Gtk, GObject
 
 import socket
 import threading
 
-# Importa as funções de enquadramento/desenquadramento
 from enquadramento import (
-    enquadra_contagem,
-    desenquadra_contagem,
-    enquadra_insercao,
-    desenquadra_insercao
+    enquadrar_contagem_caracteres,
+    desenquadrar_contagem_caracteres,
+    enquadrar_insercao_bytes,
+    desenquadrar_insercao_bytes
 )
 
+# ------------------------------------------------------------
+# Funções auxiliares para bits <-> ASCII
+# ------------------------------------------------------------
+def bits_to_ascii(bitstring: str) -> bytes:
+    """ Converte string de bits (ex '010101') em bytes ASCII para envio. """
+    return bitstring.encode('ascii')
+
+def ascii_to_bits(ascii_data: bytes) -> str:
+    """ Converte bytes ASCII para string de bits. Ex: b'010101' -> '010101'. """
+    return ascii_data.decode('ascii')
+
+
+# ------------------------------------------------------------
+# Janela do Receptor
+# ------------------------------------------------------------
 class ReceiverWindow(Gtk.Window):
     """
-    Janela de Recepção:
-    - Abre um socket TCP para escutar em (host, port).
-    - Recebe os dados (bytes) e exibe o 'quadro bruto' e a tentativa de desenquadramento.
-    - Para simplificar, faremos com que a interface permita escolher o protocolo de desenquadramento
-      ou tente ambos e mostre o que der certo.
+    Recebe dados via socket TCP.
+    - Escolhe protocolo (bits ou bytes).
+    - Ao chegar dados, exibe:
+      - O quadro bruto (em bits se for contagem, ou em hex se for inserção).
+      - O resultado desenquadrado.
     """
     def __init__(self):
-        super().__init__(title="Receptor (Receiver)")
+        super().__init__(title="Receptor (Simulação)")
         self.set_border_width(10)
         
-        # Layout principal
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.add(vbox)
         
-        # Campo para escolher a porta
+        # Linha para porta e botão iniciar servidor
         hbox_port = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        lbl_port = Gtk.Label(label="Porta para escutar:")
+        lbl_port = Gtk.Label(label="Porta:")
         self.entry_port = Gtk.Entry()
         self.entry_port.set_text("5000")
         btn_listen = Gtk.Button(label="Iniciar Servidor")
         btn_listen.connect("clicked", self.on_listen_clicked)
-        
         hbox_port.pack_start(lbl_port, False, False, 0)
         hbox_port.pack_start(self.entry_port, False, False, 0)
         hbox_port.pack_start(btn_listen, False, False, 0)
         
         vbox.pack_start(hbox_port, False, False, 0)
         
-        # ComboBox para escolher protocolo de desenquadramento
+        # Combo de protocolo
         self.combo_protocol = Gtk.ComboBoxText()
-        self.combo_protocol.append_text("Contagem")
-        self.combo_protocol.append_text("Inserção")
-        self.combo_protocol.set_active(0)  # Padrão: Contagem
+        self.combo_protocol.append_text("Contagem (bits)")
+        self.combo_protocol.append_text("Inserção (bytes)")
+        self.combo_protocol.set_active(0)
         vbox.pack_start(self.combo_protocol, False, False, 0)
         
-        # Área de texto para mostrar recebimentos
+        # Área de texto para logs
         self.buffer_display = Gtk.TextBuffer()
         textview = Gtk.TextView(buffer=self.buffer_display)
         textview.set_editable(False)
@@ -62,128 +74,124 @@ class ReceiverWindow(Gtk.Window):
         
         vbox.pack_start(scroll, True, True, 0)
         
-        # Atributo para thread de servidor
         self.server_thread = None
-        self.server_socket = None
         self.stop_server = threading.Event()
         
-        self.set_default_size(400, 300)
+        self.set_default_size(450, 300)
         self.show_all()
 
     def on_listen_clicked(self, widget):
-        """Inicia a thread de servidor TCP na porta escolhida."""
+        """ Inicia o servidor TCP na porta escolhida. """
         port_str = self.entry_port.get_text().strip()
         if not port_str.isdigit():
             self.log_message("Porta inválida.")
             return
-        port = int(port_str)
         
-        # Se já existe servidor rodando, paramos
+        port = int(port_str)
         if self.server_thread and self.server_thread.is_alive():
-            self.log_message("Servidor já está em execução.")
+            self.log_message("Servidor já em execução.")
             return
         
-        # Reinicia a flag de parada
         self.stop_server.clear()
-        
         self.server_thread = threading.Thread(
             target=self.run_server,
             args=("0.0.0.0", port),
-            daemon=True  # thread demon, fecha junto com app
+            daemon=True
         )
         self.server_thread.start()
-        
         self.log_message(f"Servidor iniciado na porta {port}.")
 
     def run_server(self, host, port):
-        """Método que roda em thread separada, escuta TCP e recebe frames."""
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind((host, port))
-            s.listen(5)
-            s.settimeout(1.0)  # timeout para poder checar "stop_server" periodicamente
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
+            srv.bind((host, port))
+            srv.listen(5)
+            srv.settimeout(1.0)  # timeout para poder checar stop_server
             
             while not self.stop_server.is_set():
                 try:
-                    client_socket, addr = s.accept()
+                    client_socket, addr = srv.accept()
                 except socket.timeout:
-                    continue  # volta a checar stop_server
+                    continue
                 
-                self.log_message_threadsafe(f"Conexão de {addr}.")
+                self.log_message_threadsafe(f"Conexão de {addr}")
                 
-                # Recebe dados até encerrar a conexão
+                # Receber todos os dados
+                data = b""
                 with client_socket:
-                    data = b""
                     while True:
-                        try:
-                            chunk = client_socket.recv(1024)
-                            if not chunk:
-                                break
-                            data += chunk
-                        except:
+                        chunk = client_socket.recv(1024)
+                        if not chunk:
                             break
-                    
-                    if data:
-                        # Temos um quadro. Vamos tentar desenquadrar.
-                        self.process_received_data(data, addr)
+                        data += chunk
+                
+                if data:
+                    self.process_received_data(data, addr)
 
     def process_received_data(self, data: bytes, addr):
         """
-        Processa os dados recebidos:
-        1. Exibe o quadro bruto (em hexa ou decimal).
-        2. Desenquadra conforme o protocolo escolhido no combo.
-        3. Mostra o texto resultante ou erro.
+        De acordo com o protocolo (contagem bits ou inserção bytes),
+        exibe o quadro e desenquadra.
         """
-        # Exibir quadro bruto
-        proto = self.combo_protocol.get_active_text()  # "Contagem" ou "Inserção"
+        proto = self.combo_protocol.get_active_text()
         
-        # Log do quadro bruto (hexa)
-        self.log_message_threadsafe(f"Quadro bruto (hex): {data.hex()}")
+        if proto == "Contagem (bits)":
+            # Recebemos 'data' como ASCII que representa bits
+            bits_str = ascii_to_bits(data)  # converte b'010101' -> '010101'
+            self.log_message_threadsafe(f"Quadro bruto (bits, ASCII): {bits_str}")
+            
+            try:
+                resultado = desenquadrar_contagem_caracteres(bits_str)
+                self.log_message_threadsafe(f"Desenquadrado (bits): {resultado}")
+            except Exception as e:
+                self.log_message_threadsafe(f"Erro ao desenquadrar (bits): {e}")
         
-        if proto == "Contagem":
+        else:  # Inserção (bytes)
+            # 'data' é o quadro real com flags e escapes
+            # exibir em hexa para fins de debug
+            self.log_message_threadsafe(f"Quadro bruto (hex): {data.hex()}")
+            
             try:
-                text = desenquadra_contagem(data)
-                self.log_message_threadsafe(f"Texto desenquadrado (Contagem): {text}")
+                resultado = desenquadrar_insercao_bytes(data)
+                self.log_message_threadsafe(f"Desenquadrado (ASCII): {resultado}")
             except Exception as e:
-                self.log_message_threadsafe(f"Erro ao desenquadrar (Contagem): {e}")
-        else:
-            # Inserção
-            try:
-                text = desenquadra_insercao(data)
-                self.log_message_threadsafe(f"Texto desenquadrado (Inserção): {text}")
-            except Exception as e:
-                self.log_message_threadsafe(f"Erro ao desenquadrar (Inserção): {e}")
+                self.log_message_threadsafe(f"Erro ao desenquadrar (bytes): {e}")
 
-    def log_message_threadsafe(self, msg: str):
-        """Agendar para atualizar a interface (TextBuffer) na thread principal."""
+    def log_message_threadsafe(self, msg):
         GObject.idle_add(self.log_message, msg)
 
-    def log_message(self, msg: str):
-        """Escreve 'msg' no TextBuffer de forma simples."""
+    def log_message(self, msg):
         end_iter = self.buffer_display.get_end_iter()
         self.buffer_display.insert(end_iter, msg + "\n")
 
     def close_server(self):
-        """Fecha o servidor ao encerrar a janela."""
         self.stop_server.set()
-        # Se quiser, podemos fechar o socket forçosamente
-        # mas usamos settimeout e "stop_server" no loop
 
     def destroy(self):
         self.close_server()
         super().destroy()
 
+
+# ------------------------------------------------------------
+# Janela do Transmissor
+# ------------------------------------------------------------
 class TransmitterWindow(Gtk.Window):
+    """
+    Transmissor:
+    - Escolhe IP e porta do receptor
+    - Escolhe protocolo (contagem bits ou inserção bytes)
+    - Enquadra e envia
+    """
     def __init__(self):
-        super().__init__(title="Transmissor (Transmitter)")
+        super().__init__(title="Transmissor (Simulação)")
         self.set_border_width(10)
         
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.add(vbox)
         
-        # Campos IP e Porta
+        # Linha para IP e Porta
         hbox_net = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         
-        lbl_ip = Gtk.Label(label="IP do Receptor:")
+        lbl_ip = Gtk.Label(label="IP:")
         self.entry_ip = Gtk.Entry()
         self.entry_ip.set_text("127.0.0.1")
         
@@ -199,19 +207,18 @@ class TransmitterWindow(Gtk.Window):
         vbox.pack_start(hbox_net, False, False, 0)
         
         # Campo de mensagem
-        lbl_msg = Gtk.Label(label="Mensagem a enviar:")
+        lbl_msg = Gtk.Label(label="Mensagem/Bits:")
         self.entry_msg = Gtk.Entry()
-        self.entry_msg.set_text("Olá, receptor!")
+        self.entry_msg.set_text("01010111")  # Exemplo para contagem (bits)
         
         vbox.pack_start(lbl_msg, False, False, 0)
         vbox.pack_start(self.entry_msg, False, False, 0)
         
-        # Escolha de protocolo
+        # Combo protocolo
         self.combo_protocol = Gtk.ComboBoxText()
-        self.combo_protocol.append_text("Contagem")
-        self.combo_protocol.append_text("Inserção")
+        self.combo_protocol.append_text("Contagem (bits)")
+        self.combo_protocol.append_text("Inserção (bytes)")
         self.combo_protocol.set_active(0)
-        
         vbox.pack_start(self.combo_protocol, False, False, 0)
         
         # Botão Enviar
@@ -219,11 +226,10 @@ class TransmitterWindow(Gtk.Window):
         btn_send.connect("clicked", self.on_send_clicked)
         vbox.pack_start(btn_send, False, False, 0)
         
-        # Área de log/saída
+        # Área de log
         self.buffer_output = Gtk.TextBuffer()
         textview = Gtk.TextView(buffer=self.buffer_output)
         textview.set_editable(False)
-        
         scroll = Gtk.ScrolledWindow()
         scroll.set_hexpand(True)
         scroll.set_vexpand(True)
@@ -231,50 +237,65 @@ class TransmitterWindow(Gtk.Window):
         
         vbox.pack_start(scroll, True, True, 0)
         
-        self.set_default_size(400, 300)
+        self.set_default_size(450, 300)
         self.show_all()
     
     def on_send_clicked(self, widget):
+        """Enquadra o dado e envia via socket TCP."""
         ip = self.entry_ip.get_text().strip()
         port_str = self.entry_port.get_text().strip()
-        msg = self.entry_msg.get_text()
+        mensagem = self.entry_msg.get_text()
         
         if not port_str.isdigit():
             self.log(f"Porta inválida: {port_str}")
             return
         
         port = int(port_str)
+        proto = self.combo_protocol.get_active_text()
         
-        # Escolhe protocolo
-        proto = self.combo_protocol.get_active_text()  # "Contagem" ou "Inserção"
-        if proto == "Contagem":
-            quadro = enquadra_contagem(msg)
-        else:
-            quadro = enquadra_insercao(msg)
+        try:
+            if proto == "Contagem (bits)":
+                # Usuário deve ter digitado bits (ex '01010111')
+                quadro_bits = enquadrar_contagem_caracteres(mensagem)
+                # Precisamos enviar esses bits como texto ASCII
+                quadro_bytes = bits_to_ascii(quadro_bits)
+                # Exibir no log
+                self.log(f"Enquadrado (bits): {quadro_bits}")
+            else:
+                # Inserção (bytes)
+                # Usuário digitou texto ASCII (ex 'ola meu ~ nome } e jonas')
+                quadro_bytes = enquadrar_insercao_bytes(mensagem)
+                # Exibir em hex
+                self.log(f"Enquadrado (hex): {quadro_bytes.hex()}")
+        except Exception as e:
+            self.log(f"Erro ao enquadrar: {e}")
+            return
         
-        # Tenta enviar via socket TCP
+        # Enviar via socket
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((ip, port))
-                s.sendall(quadro)
-            
-            self.log(f"Enviado para {ip}:{port} - Quadro (hex): {quadro.hex()}")
+                s.sendall(quadro_bytes)
+            self.log(f"Enviado para {ip}:{port}")
         except Exception as e:
             self.log(f"Erro ao enviar: {e}")
     
-    def log(self, text: str):
+    def log(self, msg):
         end_iter = self.buffer_output.get_end_iter()
-        self.buffer_output.insert(end_iter, text + "\n")
+        self.buffer_output.insert(end_iter, msg + "\n")
 
+
+# ------------------------------------------------------------
+# (Opcional) Janela Principal para abrir TX/RX
+# ------------------------------------------------------------
 class MainWindow(Gtk.Window):
     def __init__(self):
-        super().__init__(title="Camada de Enlace - Principal")
+        super().__init__(title="Simulação de Enlace - Principal")
         self.set_border_width(10)
-        
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.add(vbox)
         
-        lbl_info = Gtk.Label(label="Selecione qual módulo abrir:")
+        lbl_info = Gtk.Label(label="Escolha o módulo:")
         vbox.pack_start(lbl_info, False, False, 0)
         
         btn_tx = Gtk.Button(label="Abrir Transmissor")
@@ -287,7 +308,7 @@ class MainWindow(Gtk.Window):
         
         self.set_default_size(300, 150)
         self.show_all()
-    
+
     def on_btn_tx(self, widget):
         tx_win = TransmitterWindow()
         tx_win.connect("destroy", tx_win.destroy)
