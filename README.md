@@ -6,6 +6,7 @@ Simulador para demonstração do funcionamento da camada de enlace e camada fís
 
 - Python 3.8+
 - GTK 3.0
+- pyenv (Simple Python version management)
 - Bibliotecas Python listadas em _requirements.txt_
 
 ### Dependências do Sistema (Ubuntu / WSL)
@@ -23,8 +24,29 @@ $ sudo apt install -y python3-gi python3-gi-cairo gir1.2-gtk-3.0 libgirepository
 $ python3 -m venv venv
 $ source venv/bin/activate
 ```
-
 3. Instale as dependências:
+```bash
+$ pip install -r requirements.txt
+```
+
+### Problemas na Instalação
+
+Caso ocorra problemas na instalação por causa da versão 3.12 do Python, recomendamos a instalação da versão 3.11.11 através do pyenv.
+1. Instale o [pyenv](https://github.com/pyenv/pyenv)
+2. Instale a versão 3.11.11:
+```bash
+$ pyenv install 3.11.11
+```
+3. Dentro do repositório clonado, defina a versão local do Python
+```bash
+$ pyenv local 3.11.11
+```
+4. Crie um ambiente virtual:
+```bash
+$ python3 -m venv venv
+$ source venv/bin/activate
+```
+5. Instale as dependências:
 ```bash
 $ pip install -r requirements.txt
 ```
