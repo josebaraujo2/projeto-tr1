@@ -108,9 +108,9 @@ def decode_message(received_data, modulacao, enquadramento, deteccao_erro, polin
 # Testes
 if __name__ == "__main__":
     # Configurações para teste
-    test_message = "ola, meu nome e jose!"
+    test_message = "10000001"
     test_modulacao = "NRZ-Polar"  # Testar com "Manchester" ou "Bipolar"
-    test_enquadramento = "Contagem"  # Testar com "Inserção Bytes"
+    test_enquadramento = "Contagem"  # Testar com "contagem de caracteres ou insercao de bytes"
     deteccao_erro = "CRC"  # Testar com "Paridade" ou "CRC"
     polinomio_crc = "1101"  # Usado para CRC
 
