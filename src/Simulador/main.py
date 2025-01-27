@@ -1,13 +1,16 @@
-import multiprocessing
+import os
 import subprocess
 import sys
 import time
+import multiprocessing
 
 def start_servidor():
     """Executa o servidor."""
     try:
         print("[Servidor] Iniciando...")
-        subprocess.run([sys.executable, "servidor.py"])
+        # Modificar para caminho relativo
+        script_path = os.path.join(os.path.dirname(__file__), 'servidor.py')
+        subprocess.run([sys.executable, script_path])
     except Exception as e:
         print(f"[Servidor] Erro: {e}")
 
@@ -15,7 +18,9 @@ def start_cliente():
     """Executa o cliente."""
     try:
         print("[Cliente] Iniciando...")
-        subprocess.run([sys.executable, "cliente.py"])
+        # Modificar para caminho relativo
+        script_path = os.path.join(os.path.dirname(__file__), 'cliente.py')
+        subprocess.run([sys.executable, script_path])
     except Exception as e:
         print(f"[Cliente] Erro: {e}")
 

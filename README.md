@@ -50,11 +50,14 @@ $ source venv/bin/activate
 $ pip install -r requirements.txt
 ```
 
-## Execução
+## Execução da rotina principal
 
 ```bash
-$ python main.py transmitter  # em um terminal
-$ python main.py receiver     # em outro terminal
+python3 src/Simulador/main.py
+```
+ou navegue até o diretorio do Simulador e execute
+```bash
+python3 main.py
 ```
 
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/josebaraujo2/projeto-tr1/issues)
