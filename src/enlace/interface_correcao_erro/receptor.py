@@ -4,7 +4,7 @@ import threading
 import random
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
-from correcao_erro import corrigir_hamming
+from src.enlace.correcao_erro import corrigir_hamming
 
 
 class ReceptorApp(Gtk.Window):

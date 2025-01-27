@@ -2,7 +2,7 @@ import gi
 import socket
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
-from correcao_erro import gerar_hamming
+from src.enlace.correcao_erro import gerar_hamming
 
 
 class TransmissorApp(Gtk.Window):

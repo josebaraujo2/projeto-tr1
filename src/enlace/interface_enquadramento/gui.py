@@ -5,7 +5,7 @@ from gi.repository import Gtk, GObject
 import socket
 import threading
 
-from enquadramento import (
+from src.enlace.enquadramento import (
     enquadrar_contagem_caracteres,
     desenquadrar_contagem_caracteres,
     enquadrar_insercao_bytes,

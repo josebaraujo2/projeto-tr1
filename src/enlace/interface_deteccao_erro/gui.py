@@ -1,5 +1,5 @@
 import gi
-from deteccao_erro import calcular_paridade, verificar_paridade, calcular_crc, verificar_crc
+from src.enlace.detecao_erro import calcular_paridade, verificar_paridade, calcular_crc, verificar_crc
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib
