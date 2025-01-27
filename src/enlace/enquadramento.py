@@ -49,36 +49,32 @@ def enquadrar_insercao_bytes(dados):
 
 
 def desenquadrar_insercao_bytes(quadro):
-    """
-    Desenquadramento com Inserção de Bytes.
-    Remove flags e processa escapes.
-    """
+    # Flag e escape bytes
     flag = b'\x7E'
     escape = b'\x7D'
-
-    # Verifica se começa e termina com a flag
+    
+    # Verifica se o quadro começa e termina com as flags corretas
     if not (quadro.startswith(flag) and quadro.endswith(flag)):
-        raise ValueError("Quadro inválido: flags de início e fim ausentes.")
+        raise ValueError("Quadro inválido: flags de início/fim ausentes.")
     
-    # Remove as flags
-    dados_escapados = quadro[1:-1]
-    
-    # Remove escapes
+    # Remove as flags de início e fim
+    dados_escapados = quadro[1:-1]  # remove as flags
     dados = b''
     skip = False
+
     for i in range(len(dados_escapados)):
         byte = dados_escapados[i]
         if skip:
-            # Remove o escape aplicando XOR com 0x20
-            dados += bytes([byte ^ 0x20])
+            dados += bytes([byte ^ 0x20])  # Remove o escape aplicando XOR novamente
             skip = False
         elif byte == escape[0]:
-            # Próximo byte é escapado
-            skip = True
+            skip = True  # Quando encontrar o byte de escape, marcar para aplicar o XOR no próximo byte
         else:
             dados += bytes([byte])
-    
-    return dados.decode('ascii')
+
+    # Agora, temos os dados "limpos" sem as flags e sem escapes
+    return dados
+
 
 # Exemplo de uso
 dados = "ola meu ~ nome } e jonas"

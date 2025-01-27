@@ -21,14 +21,20 @@ class Receptor:
     def receive_message(self, received_data, modulacao='NRZ-Polar', enquadramento='Contagem'):
         try:
             print("\n=== Iniciando decodificação ===")
+            
+            # Verifica se received_data é bytes, caso contrário converte
+            if isinstance(received_data, str):
+                received_data = received_data.encode('ascii')  # Converte para bytes, se necessário
+
             decoded_message = decode_message(received_data, modulacao, enquadramento, "CRC", "1101")
             if decoded_message:
                 GLib.idle_add(self.window.update_received_message, decoded_message)
-                return True  
+                return True
             return False
         except Exception as e:
             print(f"Erro na recepção: {e}")
             return False
+
 
 class ReceiverWindow(Gtk.Window):
     def __init__(self, receptor):

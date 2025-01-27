@@ -24,7 +24,7 @@ class ClienteNetwork:
             # Criar transmissor
             self.transmissor = Transmissor(self, self.client_socket)
             self.transmissor.window.show_all()
-            
+                
         except Exception as e:
             print(f"Erro na configuração do cliente: {e}")
             return None

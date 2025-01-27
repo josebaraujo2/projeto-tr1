@@ -76,6 +76,7 @@ def test_carrier_modulation():
     detailed_comparison(bits[:len(qam_demod)], qam_demod, "8-QAM")
 
 def main():
+    test_digital_modulation()   
     test_carrier_modulation()
 
 if __name__ == "__main__":
