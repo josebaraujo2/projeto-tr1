@@ -1,4 +1,4 @@
-# Imports necessários
+import logging
 from src.fisica.digital import ModulacaoDigital
 from src.enlace.enquadramento import (
     enquadrar_contagem_caracteres,
@@ -7,7 +7,6 @@ from src.enlace.enquadramento import (
     desenquadrar_insercao_bytes,
 )
 from src.enlace.detecao_erro import calcular_paridade, verificar_paridade, calcular_crc, verificar_crc
-
 
 # Funções auxiliares
 def bytes_to_bits(data):
@@ -21,8 +20,6 @@ def bits_to_string(bits):
     bytes_data = bytes(int(bit_str[i:i+8], 2) for i in range(0, len(bit_str), 8))
     return bytes_data.decode('utf-8')
 
-
-# Função para codificar mensagem
 def encode_message(message, modulacao, enquadramento, deteccao_erro, polinomio_crc):
     # 1. Enquadramento
     if enquadramento == 'Contagem':
@@ -36,7 +33,7 @@ def encode_message(message, modulacao, enquadramento, deteccao_erro, polinomio_c
     
     print(f"Framed message (bytes): {framed_message}")
     
-    # 2. Convert framed message to bits
+    # 2. Convert framed message to bits (converter os bytes em bits)
     bits = ''.join(format(byte, '08b') for byte in framed_message)
     print(f"Bits: {bits}")
     
@@ -58,11 +55,18 @@ def encode_message(message, modulacao, enquadramento, deteccao_erro, polinomio_c
     print(f"Modulated message: {modulated_message}")
     return modulated_message
 
+def decode_message(received_data, modulacao, enquadramento, deteccao_erro, polinomio=None, logger=None):
+    # Se nenhum logger for passado, criar um logger básico
+    if logger is None:
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
-# Função para decodificar mensagem
-def decode_message(received_data, modulacao, enquadramento, deteccao_erro, polinomio=None):
-    print("\n=== Decoding Message ===")
-    print(f"Received raw data: {received_data}")
+    logger.info(f"Received raw data: {received_data}")
 
     # 1. Demodulação
     if modulacao == 'NRZ-Polar':
@@ -73,27 +77,28 @@ def decode_message(received_data, modulacao, enquadramento, deteccao_erro, polin
         demodulated_bits = ModulacaoDigital.demodular_bipolar(received_data)
 
     demodulated_bits_str = ''.join(map(str, demodulated_bits))
-    print(f"Demodulated bits: {demodulated_bits_str}")
+    logger.info(f"Demodulated bits: {demodulated_bits_str}")
 
     # 2. Verificar detecção de erro
     if deteccao_erro == 'Paridade':
         if not verificar_paridade(demodulated_bits_str):
-            print("Parity check failed")
+            logger.error("Parity check failed")
             return None
         original_bits = demodulated_bits_str[:-1]
     elif deteccao_erro == 'CRC' and polinomio:
         if not verificar_crc(demodulated_bits_str, polinomio):
-            print("CRC check failed")
+            logger.error("CRC check failed")
             return None
         original_bits = demodulated_bits_str[:-(len(polinomio) - 1)]
     else:
+        logger.error("Método de detecção de erro inválido ou polinômio não fornecido para CRC.")
         raise ValueError("Método de detecção de erro inválido ou polinômio não fornecido para CRC.")
 
-    print(f"Original bits (without error detection): {original_bits}")
+    logger.info(f"Original bits (without error detection): {original_bits}")
 
     # 3. Converter bits para bytes
     original_bytes = bytes(int(original_bits[i:i+8], 2) for i in range(0, len(original_bits), 8))
-    print(f"Original bytes: {original_bytes}")
+    logger.info(f"Original bytes: {original_bytes}")
 
     # 4. Desenquadramento
     if enquadramento == 'Contagem':
@@ -101,9 +106,8 @@ def decode_message(received_data, modulacao, enquadramento, deteccao_erro, polin
     else:
         original_message = desenquadrar_insercao_bytes(original_bytes)
 
-    print(f"Decoded message: {original_message.decode('utf-8')}")
+    logger.info(f"Decoded message: {original_message.decode('utf-8')}")
     return original_message.decode('utf-8')
-
 
 # Testes
 if __name__ == "__main__":

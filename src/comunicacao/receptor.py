@@ -13,11 +13,32 @@ from src.fisica.digital import ModulacaoDigital
 from src.comunicacao.test_network_simulator import encode_message, decode_message
 from src.comunicacao.visualizacao_de_sinal import SignalVisualizationWindow
 
+import logging
+from io import StringIO
+
 class Receptor:
     def __init__(self, simulator, socket_connection):
         self.simulator = simulator
         self.socket_connection = socket_connection
         self.window = ReceiverWindow(self)
+
+        # Configurar o logger
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+
+        # Criar um StringIO para capturar os logs
+        self.log_capture_string = StringIO()
+
+        # Configurar um handler para enviar os logs para o StringIO
+        handler = logging.StreamHandler(self.log_capture_string)
+        handler.setLevel(logging.INFO)
+
+        # Formatar as mensagens de log
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+
+        # Adicionar o handler ao logger
+        self.logger.addHandler(handler)
 
     def receive_message(self, received_data, modulacao='NRZ-Polar', enquadramento='Contagem'):
         try:
@@ -25,7 +46,19 @@ class Receptor:
             if isinstance(received_data, str):
                 received_data = received_data.encode('ascii')
             
-            decoded_message = decode_message(received_data, modulacao, enquadramento, "CRC", "1101")
+            # Limpar o buffer antes de decodificar uma nova mensagem
+            self.log_capture_string.truncate(0)  # Limpa o buffer
+            self.log_capture_string.seek(0)      # Reinicia o ponteiro do buffer
+
+            # Passar o logger para a função decode_message
+            decoded_message = decode_message(
+                received_data, 
+                modulacao, 
+                enquadramento, 
+                "CRC", 
+                "1101", 
+                logger=self.logger  # Passando o logger como argumento
+            )
             if decoded_message:
                 GLib.idle_add(
                     self.window.update_received_message, 
@@ -38,7 +71,6 @@ class Receptor:
         except Exception as e:
             print(f"Erro na recepção: {e}")
             return False
-
 
 class ReceiverWindow(Gtk.Window):
     def __init__(self, receptor):
@@ -136,16 +168,20 @@ class ReceiverWindow(Gtk.Window):
             print("Nenhum sinal recebido para visualização.")
 
     def show_debug_window(self, modulacao, decoded_message):
-        """Exibe a janela de debug com as etapas de decodificação"""
-        # Criar uma nova janela para exibir os logs
+        # Capturar os logs gerados
+        logs = self.receptor.log_capture_string.getvalue()  # Obtém todos os logs capturados
+
+        # Limpar o buffer após capturar os logs
+        self.receptor.log_capture_string.truncate(0)  # Limpa o buffer
+        self.receptor.log_capture_string.seek(0)      # Reinicia o ponteiro do buffer
+
+        # Exibir os logs na janela de debug
         debug_window = Gtk.Window(title="Debug - Etapas da Decodificação")
         debug_window.set_default_size(600, 400)
 
-        # Box para organizar a interface
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         debug_window.add(box)
 
-        # Exibir logs
         buffer = Gtk.TextBuffer()
         text_view = Gtk.TextView(buffer=buffer)
         text_view.set_editable(False)
@@ -153,22 +189,5 @@ class ReceiverWindow(Gtk.Window):
         scrolled_window.add(text_view)
         box.pack_start(scrolled_window, True, True, 0)
 
-        # Formatando os logs com as etapas de decodificação
-        import datetime
-        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-
-        # Adicionando logs de cada etapa da decodificação
-        log_message = f"[{timestamp}] Dados recebidos (raw): {self.last_received_signal}\n"
-        log_message += f"[{timestamp}] Modulação: {modulacao}\n"
-
-        # Demodulação (após a modulação)
-        log_message += f"[{timestamp}] Bits demodulados: {''.join(map(str, decoded_message))}\n"
-
-        # Mensagem desenquadrada (adicionando o método de desenquadramento selecionado)
-        log_message += f"[{timestamp}] Mensagem desenquadrada: {decoded_message}\n"
-
-        # Exibindo no buffer da janela de debug
-        buffer.set_text(log_message)
-
-        # Exibindo a janela
+        buffer.set_text(logs)  # Exibe os logs capturados
         debug_window.show_all()

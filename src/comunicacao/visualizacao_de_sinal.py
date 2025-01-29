@@ -44,26 +44,3 @@ class SignalVisualizationWindow(Gtk.Window):
         ax.set_title(f"Sinal {signal_type}")
         ax.grid(True)
         self.canvas.draw()
-        
-    def plot_comparison(self, original, decoded, modulation_type):
-        """Plot comparison between original and decoded signals"""
-        self.figure.clear()
-        
-        # Plot original vs decoded
-        ax1 = self.figure.add_subplot(211)
-        ax1.plot(original, label='Original', marker='o')
-        ax1.plot(decoded, label='Decodificado', marker='x')
-        ax1.set_title(f"{modulation_type} - Original vs Decodificado")
-        ax1.legend()
-        ax1.grid(True)
-        
-        # Plot errors
-        ax2 = self.figure.add_subplot(212)
-        errors = [i for i in range(len(original)) if original[i] != decoded[i]]
-        error_positions = [1 if i in errors else 0 for i in range(len(original))]
-        ax2.plot(error_positions, 'r')
-        ax2.set_title("Posições de Erro")
-        ax2.grid(True)
-        
-        self.figure.tight_layout()
-        self.canvas.draw()
