@@ -11,6 +11,7 @@ from src.enlace.enquadramento import (
 from src.enlace.detecao_erro import calcular_paridade, verificar_paridade
 from src.fisica.digital import ModulacaoDigital
 from src.comunicacao.test_network_simulator import encode_message, decode_message
+from src.comunicacao.visualizacao_de_sinal import SignalVisualizationWindow
 
 class Transmissor:
     def __init__(self, simulator, client_socket):
@@ -54,14 +55,14 @@ class TransmitterWindow(Gtk.Window):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.add(box)
 
-        # Text input
+        # Text input (mantido como estava)
         self.text_input = Gtk.TextView()
         self.text_input.set_margin_start(10)
         self.text_input.set_margin_end(10)
         self.text_input.set_margin_top(10)
         box.pack_start(self.text_input, True, True, 0)
 
-        # Modulação Combo
+        # Modulação Combo (mantido como estava)
         modulacao_label = Gtk.Label(label="Modulação:")
         box.pack_start(modulacao_label, False, False, 0)
         self.modulacao_combo = Gtk.ComboBoxText()
@@ -71,7 +72,7 @@ class TransmitterWindow(Gtk.Window):
         self.modulacao_combo.set_active(0)
         box.pack_start(self.modulacao_combo, False, False, 0)
 
-        # Enquadramento Combo
+        # Enquadramento Combo (mantido como estava)
         enquadramento_label = Gtk.Label(label="Enquadramento:")
         box.pack_start(enquadramento_label, False, False, 0)
         self.enquadramento_combo = Gtk.ComboBoxText()
@@ -80,24 +81,53 @@ class TransmitterWindow(Gtk.Window):
         self.enquadramento_combo.set_active(0)
         box.pack_start(self.enquadramento_combo, False, False, 0)
 
+        # Button box para organizar os botões
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        button_box.set_margin_start(10)
+        button_box.set_margin_end(10)
+        button_box.set_margin_bottom(10)
+        box.pack_start(button_box, False, False, 0)
+
+        # Visualizar button
+        view_button = Gtk.Button(label="Visualizar Modulação")
+        view_button.connect("clicked", self.on_view_clicked)
+        button_box.pack_start(view_button, True, True, 0)
+
         # Send button
         send_button = Gtk.Button(label="Transmitir")
         send_button.connect("clicked", self.on_send_clicked)
-        send_button.set_margin_start(10)
-        send_button.set_margin_end(10)
-        send_button.set_margin_bottom(10)
-        box.pack_start(send_button, False, False, 0)
+        button_box.pack_start(send_button, True, True, 0)
+
+        # Armazenar último sinal modulado
+        self.last_modulated_signal = None
+
+    def on_view_clicked(self, widget):
+        if self.last_modulated_signal is not None and self.last_modulated_signal.size > 0:
+            # Se não houver sinal modulado, modular o texto atual
+            buffer = self.text_input.get_buffer()
+            start_iter = buffer.get_start_iter()
+            end_iter = buffer.get_end_iter()
+            text = buffer.get_text(start_iter, end_iter, True)
+            modulacao = self.modulacao_combo.get_active_text()
+            
+            # Modular o texto
+            modulated_signal = encode_message(text, modulacao, 'Contagem', "CRC", "1101")
+            self.last_modulated_signal = modulated_signal
+
+        # Criar e mostrar janela de visualização
+        vis_window = SignalVisualizationWindow(f"Visualização - {self.modulacao_combo.get_active_text()}")
+        vis_window.plot_signal(self.last_modulated_signal, self.modulacao_combo.get_active_text())
+        vis_window.show_all()
 
     def on_send_clicked(self, widget):
-        # Obtém o texto do TextView
         buffer = self.text_input.get_buffer()
         start_iter = buffer.get_start_iter()
         end_iter = buffer.get_end_iter()
         text = buffer.get_text(start_iter, end_iter, True)
 
-        # Obtém modulação e enquadramento selecionados
         modulacao = self.modulacao_combo.get_active_text()
         enquadramento = self.enquadramento_combo.get_active_text()
 
-        # Chama método de transmissão do transmissor
+        # Armazenar o sinal modulado antes de enviar
+        self.last_modulated_signal = encode_message(text, modulacao, enquadramento, "CRC", "1101")
         self.transmitter.transmit_message(text, modulacao, enquadramento)

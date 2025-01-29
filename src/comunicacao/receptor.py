@@ -11,6 +11,7 @@ from src.enlace.enquadramento import (
 from src.enlace.detecao_erro import calcular_paridade, verificar_paridade
 from src.fisica.digital import ModulacaoDigital
 from src.comunicacao.test_network_simulator import encode_message, decode_message
+from src.comunicacao.visualizacao_de_sinal import SignalVisualizationWindow
 
 class Receptor:
     def __init__(self, simulator, socket_connection):
@@ -21,16 +22,19 @@ class Receptor:
     def receive_message(self, received_data, modulacao='NRZ-Polar', enquadramento='Contagem'):
         try:
             print("\n=== Iniciando decodificação ===")
-            
-            # Verifica se received_data é bytes, caso contrário converte
             if isinstance(received_data, str):
-                received_data = received_data.encode('ascii')  # Converte para bytes, se necessário
-
+                received_data = received_data.encode('ascii')
+            
             decoded_message = decode_message(received_data, modulacao, enquadramento, "CRC", "1101")
             if decoded_message:
-                GLib.idle_add(self.window.update_received_message, decoded_message)
-                return True
-            return False
+                GLib.idle_add(
+                    self.window.update_received_message, 
+                    decoded_message,
+                    received_data,  # Passar o sinal recebido
+                    modulacao      # Passar o tipo de modulação
+                )
+            return True
+        
         except Exception as e:
             print(f"Erro na recepção: {e}")
             return False
@@ -45,11 +49,12 @@ class ReceiverWindow(Gtk.Window):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.add(box)
 
+        # Status label
         self.status_label = Gtk.Label(label="Aguardando mensagens...")
         self.status_label.set_margin_top(10)
         box.pack_start(self.status_label, False, False, 0)
 
-        # Usar ScrolledWindow para mensagens longas
+        # ScrolledWindow para mensagens
         scrolled = Gtk.ScrolledWindow()
         scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         box.pack_start(scrolled, True, True, 0)
@@ -62,21 +67,108 @@ class ReceiverWindow(Gtk.Window):
         self.text_view.set_margin_bottom(10)
         scrolled.add(self.text_view)
 
-    def update_received_message(self, message):
+        # Botão de visualizar demodulação
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        button_box.set_margin_start(10)
+        button_box.set_margin_end(10)
+        button_box.set_margin_bottom(10)
+        box.pack_start(button_box, False, False, 0)
+
+        view_demod_button = Gtk.Button(label="Visualizar Demodulação")
+        view_demod_button.connect("clicked", self.on_view_clicked)
+        button_box.pack_start(view_demod_button, True, True, 0)
+
+        # Armazenar o último sinal recebido e modulação
+        self.last_received_signal = None
+        self.last_modulation_type = None
+        self.last_message = None
+
+    def update_received_message(self, decoded_message, raw_data, modulacao):
+        """Atualiza a interface para exibir apenas a mensagem limpa"""
         buffer = self.text_view.get_buffer()
-        # Adicionar timestamp para cada mensagem
         import datetime
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-        formatted_message = f"[{timestamp}] {message}\n"
-        
-        # Adicionar nova mensagem ao final do buffer
-        end_iter = buffer.get_end_iter()
-        buffer.insert(end_iter, formatted_message)
-        
-        # Auto-scroll para a última mensagem
+
+        # Exibir a mensagem limpa recebida
+        formatted_message = f"[{timestamp}] {decoded_message}\n"
+        buffer.insert(buffer.get_end_iter(), formatted_message)
         mark = buffer.create_mark(None, buffer.get_end_iter(), False)
         self.text_view.scroll_to_mark(mark, 0.0, True, 0.0, 1.0)
-        
-        # Atualizar status
+
+        # Atualizar o status da última mensagem recebida
         self.status_label.set_text(f"Última mensagem recebida às {timestamp}")
-        return False  # Importante para o GLib.idle_add
+        
+        # Salvar os dados recebidos para visualização futura
+        self.last_received_signal = raw_data
+        self.last_modulation_type = modulacao
+        self.last_message = decoded_message
+        
+        # Mostrar um pop-up de sucesso (se não houver erro)
+        self.show_success_popup(decoded_message)
+
+    def show_success_popup(self, message):
+        """Exibe um popup indicando que a mensagem foi recebida com sucesso"""
+        dialog = Gtk.MessageDialog(
+            self, 
+            Gtk.DialogFlags.MODAL, 
+            Gtk.MessageType.INFO, 
+            Gtk.ButtonsType.OK, 
+            f"Mensagem sem erros"
+        )
+        dialog.run()
+        dialog.destroy()
+
+    def on_view_clicked(self, widget):
+        """Abre uma janela de debug para exibir os logs da decodificação"""
+        # Verificar se os dados de sinal foram recebidos corretamente
+        if self.last_received_signal is not None and len(self.last_received_signal) > 0:
+            # Modulação e enquadramento devem ser conhecidos
+            modulacao = self.last_modulation_type  # Tipo de modulação
+            enquadramento = 'Contagem'  # Método de enquadramento (ajuste conforme necessário)
+
+            # Chamar a função de decodificação
+            decoded_message = decode_message(self.last_received_signal, modulacao, enquadramento, "CRC", "1101")
+            
+            # Se a decodificação for bem-sucedida, exibir os logs de debug
+            if decoded_message:
+                self.show_debug_window(modulacao, decoded_message)
+        else:
+            print("Nenhum sinal recebido para visualização.")
+
+    def show_debug_window(self, modulacao, decoded_message):
+        """Exibe a janela de debug com as etapas de decodificação"""
+        # Criar uma nova janela para exibir os logs
+        debug_window = Gtk.Window(title="Debug - Etapas da Decodificação")
+        debug_window.set_default_size(600, 400)
+
+        # Box para organizar a interface
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        debug_window.add(box)
+
+        # Exibir logs
+        buffer = Gtk.TextBuffer()
+        text_view = Gtk.TextView(buffer=buffer)
+        text_view.set_editable(False)
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.add(text_view)
+        box.pack_start(scrolled_window, True, True, 0)
+
+        # Formatando os logs com as etapas de decodificação
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+
+        # Adicionando logs de cada etapa da decodificação
+        log_message = f"[{timestamp}] Dados recebidos (raw): {self.last_received_signal}\n"
+        log_message += f"[{timestamp}] Modulação: {modulacao}\n"
+
+        # Demodulação (após a modulação)
+        log_message += f"[{timestamp}] Bits demodulados: {''.join(map(str, decoded_message))}\n"
+
+        # Mensagem desenquadrada (adicionando o método de desenquadramento selecionado)
+        log_message += f"[{timestamp}] Mensagem desenquadrada: {decoded_message}\n"
+
+        # Exibindo no buffer da janela de debug
+        buffer.set_text(log_message)
+
+        # Exibindo a janela
+        debug_window.show_all()
