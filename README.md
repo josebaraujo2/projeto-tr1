@@ -53,7 +53,8 @@ $ pip install -r requirements.txt
 ## Execução da rotina principal
 
 ```bash
-python3 src/Simulador/main.py
+cd /home/josebaraujo/tr1/projeto
+python3 -m src.Simulador.main
 ```
 ou navegue até o diretorio do Simulador e execute
 ```bash

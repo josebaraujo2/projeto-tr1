@@ -134,21 +134,6 @@ class ReceiverWindow(Gtk.Window):
         self.last_received_signal = raw_data
         self.last_modulation_type = modulacao
         self.last_message = decoded_message
-        
-        # Mostrar um pop-up de sucesso (se não houver erro)
-        self.show_success_popup(decoded_message)
-
-    def show_success_popup(self, message):
-        """Exibe um popup indicando que a mensagem foi recebida com sucesso"""
-        dialog = Gtk.MessageDialog(
-            self, 
-            Gtk.DialogFlags.MODAL, 
-            Gtk.MessageType.INFO, 
-            Gtk.ButtonsType.OK, 
-            f"Mensagem sem erros"
-        )
-        dialog.run()
-        dialog.destroy()
 
     def on_view_clicked(self, widget):
         """Abre uma janela de debug para exibir os logs da decodificação"""
