@@ -54,6 +54,7 @@ $ pip install -r requirements.txt
 
 ```bash
 cd /home/josebaraujo/tr1/projeto
+export PYTHONPATH=$(pwd)
 python3 -m src.Simulador.main
 ```
 ou navegue até o diretorio do Simulador e execute
