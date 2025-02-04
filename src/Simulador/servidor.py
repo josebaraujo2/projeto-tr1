@@ -135,7 +135,8 @@ class ServidorNetwork:
             self.receptor.receive_message(
                 modulated_data,
                 header['modulacao'],
-                header['enquadramento']
+                header['enquadramento'],
+                header['metodo_erro']
             )
         return False
     

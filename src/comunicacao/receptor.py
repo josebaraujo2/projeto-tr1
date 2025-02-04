@@ -40,7 +40,7 @@ class Receptor:
         # Adicionar o handler ao logger
         self.logger.addHandler(handler)
 
-    def receive_message(self, received_data, modulacao='NRZ-Polar', enquadramento='Contagem'):
+    def receive_message(self, received_data, modulacao='NRZ-Polar', enquadramento='Contagem', metodo_erro='Hamming (Correção)'):
         try:
             print("\n=== Iniciando decodificação ===")
             if isinstance(received_data, str):
@@ -55,7 +55,7 @@ class Receptor:
                 received_data, 
                 modulacao, 
                 enquadramento, 
-                "CRC", 
+                metodo_erro, 
                 "1101", 
                 logger=self.logger  # Passando o logger como argumento
             )
@@ -64,9 +64,17 @@ class Receptor:
                     self.window.update_received_message, 
                     decoded_message,
                     received_data,  # Passar o sinal recebido
-                    modulacao      # Passar o tipo de modulação
+                    modulacao,      # Passar o tipo de modulação
+                    metodo_erro
                 )
-            return True
+                return True
+            else:
+            # Exibir mensagem de erro na interface
+                GLib.idle_add(  
+                self.window.show_error_message,
+                "Erro na mensagem!"
+                )
+                return False
         
         except Exception as e:
             print(f"Erro na recepção: {e}")
@@ -80,6 +88,9 @@ class ReceiverWindow(Gtk.Window):
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.add(box)
+        self.error_label = Gtk.Label(label="")
+        self.error_label.set_visible(False)
+        box.pack_start(self.error_label, False, False, 0)
 
         # Status label
         self.status_label = Gtk.Label(label="Aguardando mensagens...")
@@ -115,25 +126,38 @@ class ReceiverWindow(Gtk.Window):
         self.last_modulation_type = None
         self.last_message = None
 
-    def update_received_message(self, decoded_message, raw_data, modulacao):
+    def update_received_message(self, decoded_message, raw_data, modulacao, metodo_erro):
         """Atualiza a interface para exibir apenas a mensagem limpa"""
         buffer = self.text_view.get_buffer()
         import datetime
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
 
-        # Exibir a mensagem limpa recebida
-        formatted_message = f"[{timestamp}] {decoded_message}\n"
-        buffer.insert(buffer.get_end_iter(), formatted_message)
-        mark = buffer.create_mark(None, buffer.get_end_iter(), False)
-        self.text_view.scroll_to_mark(mark, 0.0, True, 0.0, 1.0)
+        if decoded_message is None:
+            self.show_error("Erro na transmissão! Mensagem corrompida.")
+        else:
+            # Exibir a mensagem limpa recebida
+            formatted_message = f"[{timestamp}] {decoded_message}\n"
+            buffer.insert(buffer.get_end_iter(), formatted_message)
+            mark = buffer.create_mark(None, buffer.get_end_iter(), False)
+            self.text_view.scroll_to_mark(mark, 0.0, True, 0.0, 1.0)
 
-        # Atualizar o status da última mensagem recebida
-        self.status_label.set_text(f"Última mensagem recebida às {timestamp}")
-        
-        # Salvar os dados recebidos para visualização futura
-        self.last_received_signal = raw_data
-        self.last_modulation_type = modulacao
-        self.last_message = decoded_message
+            # Atualizar o status da última mensagem recebida
+            self.status_label.set_text(f"Última mensagem recebida às {timestamp}")
+            
+            # Salvar os dados recebidos para visualização futura
+            self.last_received_signal = raw_data
+            self.last_modulation_type = modulacao
+            self.last_metodo_erro = metodo_erro
+            self.last_message = decoded_message
+    
+    def show_error_message(self, message):
+        self.error_label.set_text(message)
+        self.error_label.set_visible(True)
+        GLib.timeout_add_seconds(5, self.hide_error)  # Oculta após 5 segundos
+
+    def hide_error(self):
+        self.error_label.set_visible(False)
+        return False
 
     def on_view_clicked(self, widget):
         """Abre uma janela de debug para exibir os logs da decodificação"""
@@ -142,9 +166,10 @@ class ReceiverWindow(Gtk.Window):
             # Modulação e enquadramento devem ser conhecidos
             modulacao = self.last_modulation_type  # Tipo de modulação
             enquadramento = 'Contagem'  # Método de enquadramento (ajuste conforme necessário)
+            metodo_erro = self.last_metodo_erro
 
             # Chamar a função de decodificação
-            decoded_message = decode_message(self.last_received_signal, modulacao, enquadramento, "CRC", "1101")
+            decoded_message = decode_message(self.last_received_signal, modulacao, enquadramento, metodo_erro, "1101")
             
             # Se a decodificação for bem-sucedida, exibir os logs de debug
             if decoded_message:

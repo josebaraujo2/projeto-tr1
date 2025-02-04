@@ -12,7 +12,7 @@ from src.enlace.detecao_erro import calcular_paridade, verificar_paridade
 from src.fisica.digital import ModulacaoDigital
 from src.comunicacao.test_network_simulator import encode_message, decode_message
 from src.comunicacao.visualizacao_de_sinal import SignalVisualizationWindow
-from src.fisica.portadora import ModulacaoPortadora  # Importe a classe ModulacaoPortadora
+from src.fisica.portadora import ModulacaoPortadora 
 
 class Transmissor:
     def __init__(self, simulator, client_socket):
@@ -20,15 +20,16 @@ class Transmissor:
         self.client_socket = client_socket
         self.window = TransmitterWindow(self)
 
-    def transmit_message(self, message, modulacao='NRZ-Polar', enquadramento='Contagem'):
+    def transmit_message(self, message, modulacao='NRZ-Polar', enquadramento='Contagem', metodo_erro='CRC (Detecção)', ruido = False):
         try:
             import pickle
             import struct
             
-            # Preparar e enviar o header
+            # Preparar e enviar o header    
             header = {
                 'modulacao': modulacao,
-                'enquadramento': enquadramento
+                'enquadramento': enquadramento,
+                'metodo_erro': metodo_erro
             }
             header_data = pickle.dumps(header)
             header_size = struct.pack('>I', len(header_data))
@@ -36,7 +37,8 @@ class Transmissor:
             self.client_socket.send(header_data)
             
             # Preparar e enviar a mensagem modulada
-            modulated_message = encode_message(message, modulacao, enquadramento, "CRC", "1101")
+            modulated_message = encode_message(message, modulacao, enquadramento, metodo_erro, "1101", ruido = ruido)
+
             data = pickle.dumps(modulated_message)
             data_size = struct.pack('>I', len(data))
             self.client_socket.send(data_size)
@@ -51,10 +53,12 @@ class TransmitterWindow(Gtk.Window):
     def __init__(self, transmitter):
         super().__init__(title="Transmissor")
         self.transmitter = transmitter
-        self.set_default_size(400, 300)
+        self.set_default_size(500, 400)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.add(box)
+        self.ruido_check = Gtk.CheckButton(label="Simular ruído (0.01% de erro por bit)")
+        box.pack_start(self.ruido_check, False, False, 0)
 
         # Text input
         self.text_input = Gtk.TextView()
@@ -62,6 +66,16 @@ class TransmitterWindow(Gtk.Window):
         self.text_input.set_margin_end(10)
         self.text_input.set_margin_top(10)
         box.pack_start(self.text_input, True, True, 0)
+
+        # Deteccao erro combo
+        correcao_label = Gtk.Label(label="Método de Erro:")  # Alterar label
+        box.pack_start(correcao_label, False, False, 0)
+        self.correcao_combo = Gtk.ComboBoxText()
+        self.correcao_combo.append_text('Hamming (Correção)')  # Opção de correção
+        self.correcao_combo.append_text('CRC (Detecção)')       # Opção de detecção
+        self.correcao_combo.append_text('Paridade (Detecção)')  # Opção de detecção
+        self.correcao_combo.set_active(0)
+        box.pack_start(self.correcao_combo, False, False, 0)
 
         # Modulação Combo
         modulacao_label = Gtk.Label(label="Modulação:")
@@ -116,7 +130,7 @@ class TransmitterWindow(Gtk.Window):
         modulacao = self.modulacao_combo.get_active_text()
         
         # Modular o texto
-        modulated_signal = encode_message(text, modulacao, 'Contagem', "CRC", "1101")
+        modulated_signal = encode_message(text, modulacao, 'Contagem', "CRC (Detecção)", "1101")
         self.last_modulated_signal = modulated_signal
 
         # Criar e mostrar janela de visualização
@@ -167,7 +181,9 @@ class TransmitterWindow(Gtk.Window):
 
         modulacao = self.modulacao_combo.get_active_text()
         enquadramento = self.enquadramento_combo.get_active_text()
+        metodo_erro = self.correcao_combo.get_active_text()
+        ruido = self.ruido_check.get_active()
 
         # Armazenar o sinal modulado antes de enviar
-        self.last_modulated_signal = encode_message(text, modulacao, enquadramento, "CRC", "1101")
-        self.transmitter.transmit_message(text, modulacao, enquadramento)
+        self.last_modulated_signal = encode_message(text, modulacao, enquadramento, metodo_erro, "1101", ruido = ruido)
+        self.transmitter.transmit_message(text, modulacao, enquadramento, metodo_erro)

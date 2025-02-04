@@ -1,3 +1,4 @@
+import numpy as np
 def gerar_hamming(bits):
     """
     Transmissor
@@ -52,3 +53,12 @@ def corrigir_hamming(bits_hamming):
         bits_hamming[erro_pos - 1] = '1' if bits_hamming[erro_pos - 1] == '0' else '0'
 
     return ''.join(bits_hamming)
+
+def extrair_bits_hamming(bits_corrigidos):
+    n = len(bits_corrigidos)
+    bits_originais = []
+    pos_paridade = [2**i - 1 for i in range(int(np.log2(n)) + 1)]  # Posições de paridade
+    for i in range(n):
+        if i not in pos_paridade:
+            bits_originais.append(bits_corrigidos[i])
+    return ''.join(bits_originais)
