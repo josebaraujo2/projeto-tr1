@@ -63,13 +63,13 @@ class ModulacaoPortadora:
         # Garantir que o número de bits é múltiplo de 3
         estados_qam = {
         (0,0,0): (0.5, 0),      # Low amplitude, 0 phase
-        (0,0,1): (0.5, np.pi/4),
-        (0,1,0): (0.5, np.pi/2),
-        (0,1,1): (0.5, 3*np.pi/4),
+        (0,0,1): (0.5, np.pi/2),
+        (0,1,0): (0.5, np.pi),
+        (0,1,1): (0.5, 3*np.pi/2),
         (1,0,0): (1.5, 0),      # High amplitude, 0 phase
-        (1,0,1): (1.5, np.pi/4),
-        (1,1,0): (1.5, np.pi/2),
-        (1,1,1): (1.5, 3*np.pi/4)
+        (1,0,1): (1.5, np.pi/2),
+        (1,1,0): (1.5, np.pi),
+        (1,1,1): (1.5, 3*np.pi/2)
         }
         
         bits_padded = self.bits.copy()
@@ -83,7 +83,8 @@ class ModulacaoPortadora:
         
         num_amostras_total = num_simbolos * amostras_por_simbolo
         tempo = np.linspace(0, tempo_total, num_amostras_total)
-        sinal = np.zeros_like(tempo)
+        sinal_I = np.zeros_like(tempo)  # Componente em fase
+        sinal_Q = np.zeros_like(tempo)  # Componente em quadratura
         
         for i in range(0, len(bits_padded), 3):
             simbolo = tuple(bits_padded[i:i+3])
@@ -95,7 +96,12 @@ class ModulacaoPortadora:
             
             t_simbolo = tempo[inicio:fim] - tempo[inicio]
             
-            sinal[inicio:fim] = amplitude * np.cos(2 * np.pi * self.freq_portadora * t_simbolo + fase)
+            # Componentes I e Q
+            sinal_I[inicio:fim] = amplitude * np.cos(2 * np.pi * self.freq_portadora * t_simbolo + fase)
+            sinal_Q[inicio:fim] = amplitude * np.sin(2 * np.pi * self.freq_portadora * t_simbolo + fase)
+        
+        # Sinal QAM é a soma dos componentes I e Q
+        sinal = sinal_I + sinal_Q
         
         return tempo, sinal
 

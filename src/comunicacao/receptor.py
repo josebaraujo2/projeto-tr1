@@ -65,7 +65,8 @@ class Receptor:
                     decoded_message,
                     received_data,  # Passar o sinal recebido
                     modulacao,      # Passar o tipo de modulação
-                    metodo_erro
+                    metodo_erro,
+                    enquadramento
                 )
                 return True
             else:
@@ -125,8 +126,9 @@ class ReceiverWindow(Gtk.Window):
         self.last_received_signal = None
         self.last_modulation_type = None
         self.last_message = None
+        self.last_enquadramento = None
 
-    def update_received_message(self, decoded_message, raw_data, modulacao, metodo_erro):
+    def update_received_message(self, decoded_message, raw_data, modulacao, metodo_erro, enquadramento):
         """Atualiza a interface para exibir apenas a mensagem limpa"""
         buffer = self.text_view.get_buffer()
         import datetime
@@ -149,6 +151,7 @@ class ReceiverWindow(Gtk.Window):
             self.last_modulation_type = modulacao
             self.last_metodo_erro = metodo_erro
             self.last_message = decoded_message
+            self.last_enquadramento = enquadramento
     
     def show_error_message(self, message):
         self.error_label.set_text(message)
@@ -165,7 +168,7 @@ class ReceiverWindow(Gtk.Window):
         if self.last_received_signal is not None and len(self.last_received_signal) > 0:
             # Modulação e enquadramento devem ser conhecidos
             modulacao = self.last_modulation_type  # Tipo de modulação
-            enquadramento = 'Contagem'  # Método de enquadramento (ajuste conforme necessário)
+            enquadramento = self.last_enquadramento  # Método de enquadramento (ajuste conforme necessário)
             metodo_erro = self.last_metodo_erro
 
             # Chamar a função de decodificação

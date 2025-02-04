@@ -14,30 +14,45 @@ def verificar_paridade(bits_com_paridade):
     Verifica a integridade da sequência usando o bit de paridade.
     """
     paridade = bits_com_paridade[:-1].count('1') % 2
-    return paridade == int(bits_com_paridade[:-1])
+    return paridade == int(bits_com_paridade[-1])
 
 def calcular_crc(bits, polinomio):
-    len_polinomio = len(polinomio)
-    dividendo = list(bits) + ['0'] * (len_polinomio - 1)
-    polinomio = list(polinomio)
+    """
+    Transmissor
+    Protocolo de Detecção de Erros: CRC
+    Calcula o CRC para a sequência de bits e adiciona ao final.
+    A operação de CRC é feita com XOR bit a bit.
+    """
 
-    for i in range(len(dividendo) - len_polinomio + 1):
-        if dividendo[i] == '1':
-            for j in range(len_polinomio):
-                dividendo[i + j] = '1' if dividendo[i + j] != polinomio[j] else '0'
+    bits_dividendo = bits + '0' * (len(polinomio) - 1)  
+    bits_divisor = polinomio  
 
-    crc = ''.join(dividendo[-(len_polinomio - 1):])
+    bits_dividendo = list(bits_dividendo)
+
+    # faz a "divisão polinomial" bit a bit usando XOR.
+    for i in range(len(bits)):
+        if bits_dividendo[i] == '1':
+            for j in range(len(bits_divisor)):
+                bits_dividendo[i + j] = str(int(bits_dividendo[i + j]) ^ int(bits_divisor[j]))
+
+    crc = ''.join(bits_dividendo[-(len(polinomio) - 1):])  
+    
     return bits + crc
 
+
 def verificar_crc(bits_com_crc, polinomio):
-    len_polinomio = len(polinomio)
-    dividendo = list(bits_com_crc)
-    polinomio = list(polinomio)
+    """
+    Receptor
+    Verifica a integridade da sequência de bits usando CRC.
+    """
+    bits_dividendo = list(bits_com_crc)
+    bits_divisor = polinomio
 
-    for i in range(len(dividendo) - len_polinomio + 1):
-        if dividendo[i] == '1':
-            for j in range(len_polinomio):
-                dividendo[i + j] = '1' if dividendo[i + j] != polinomio[j] else '0'
+    # de novo faz a "divisão polinomial" bit a bit usando XOR, mas agora do quadro recebido (bits+CRC)
+    for i in range(len(bits_com_crc) - len(polinomio) + 1):
+        if bits_dividendo[i] == '1':
+            for j in range(len(bits_divisor)):
+                bits_dividendo[i + j] = str(int(bits_dividendo[i + j]) ^ int(bits_divisor[j]))
 
-    resto = ''.join(dividendo[-(len_polinomio - 1):])
-    return all(bit == '0' for bit in resto)
+    resto = ''.join(bits_dividendo[-(len(polinomio) - 1):])
+    return resto == '0' * (len(polinomio) - 1) # se o resto é 0, o quadro é valido
